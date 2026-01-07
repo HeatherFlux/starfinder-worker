@@ -210,8 +210,16 @@ export class HackingSession implements DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    const sender = this.sessions.get(ws)
-    if (!sender) return
+    // Get role from WebSocket tags (survives hibernation, unlike the Map)
+    const tags = this.state.getTags(ws)
+    const role = tags.includes('gm') ? 'gm' : 'player'
+
+    // Ensure sender is in sessions map (may have been cleared by hibernation)
+    let sender = this.sessions.get(ws)
+    if (!sender) {
+      sender = { role, messageTimestamps: [] }
+      this.sessions.set(ws, sender)
+    }
 
     // Rate limiting
     if (!this.checkRateLimit(sender)) {
@@ -352,8 +360,9 @@ export class HackingSession implements DurableObject {
     }
 
     // Broadcast to all OTHER connections (not back to sender)
+    // Use getWebSockets() to get all connections (survives hibernation)
     const messageStr = JSON.stringify(data)
-    for (const [socket] of this.sessions) {
+    for (const socket of this.state.getWebSockets()) {
       if (socket !== ws && socket.readyState === WebSocket.OPEN) {
         socket.send(messageStr)
       }
