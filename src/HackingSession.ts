@@ -10,14 +10,39 @@ import {
   validateEffectPayload,
 } from './validation'
 
-// Types mirrored from the main app (kept minimal for the worker)
+// Types mirrored from the main app (includes SF2e hacking extensions)
 type ComputerType = 'tech' | 'magic' | 'hybrid'
 type AccessPointType = 'physical' | 'remote' | 'magical'
 type NodeState = 'locked' | 'active' | 'breached' | 'alarmed'
+type ProficiencyRank = 'untrained' | 'trained' | 'expert' | 'master' | 'legendary'
 
 interface Position {
   x: number
   y: number
+}
+
+interface SkillCheck {
+  skill: string
+  dc: number
+  proficiency?: ProficiencyRank
+}
+
+interface Vulnerability {
+  id: string
+  name: string
+  skills: SkillCheck[]
+  dcReduction: number
+}
+
+interface Countermeasure {
+  id: string
+  name: string
+  failureThreshold: number
+  noticeDC?: number
+  noticeSkills?: string[]
+  disableSkills: SkillCheck[]
+  description: string
+  isPersistent?: boolean
 }
 
 interface AccessPoint {
@@ -27,6 +52,13 @@ interface AccessPoint {
   state: NodeState
   position: Position
   connectedTo: string[]
+  // SF2e extended fields
+  dc?: number
+  successesRequired?: number
+  hackSkills?: SkillCheck[]
+  vulnerabilities?: Vulnerability[]
+  countermeasures?: Countermeasure[]
+  currentFailures?: number
 }
 
 interface Computer {
@@ -36,6 +68,9 @@ interface Computer {
   type: ComputerType
   description?: string
   accessPoints: AccessPoint[]
+  // SF2e outcome descriptions
+  successDescription?: string
+  criticalSuccessDescription?: string
 }
 
 interface SessionState {

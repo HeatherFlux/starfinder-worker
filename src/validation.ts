@@ -14,16 +14,56 @@ export const LIMITS = {
   MIN_INTENSITY: 0,
   MAX_INTENSITY: 1,
   MAX_POSITION_VALUE: 10000,
+  // SF2e hacking limits
+  MAX_VULNERABILITIES: 10,
+  MAX_COUNTERMEASURES: 10,
+  MAX_SKILL_CHECKS: 10,
+  MAX_NOTICE_SKILLS: 5,
+  MIN_DC: 0,
+  MAX_DC: 60,
+  MIN_DC_REDUCTION: 1,
+  MAX_DC_REDUCTION: 10,
+  MIN_FAILURE_THRESHOLD: 1,
+  MAX_FAILURE_THRESHOLD: 10,
+  MIN_SUCCESSES_REQUIRED: 1,
+  MAX_SUCCESSES_REQUIRED: 10,
 } as const
 
 // ============== Types ==============
 type ComputerType = 'tech' | 'magic' | 'hybrid'
 type AccessPointType = 'physical' | 'remote' | 'magical'
 type NodeState = 'locked' | 'active' | 'breached' | 'alarmed'
+type ProficiencyRank = 'untrained' | 'trained' | 'expert' | 'master' | 'legendary'
 
 const VALID_COMPUTER_TYPES = new Set<ComputerType>(['tech', 'magic', 'hybrid'])
 const VALID_ACCESS_POINT_TYPES = new Set<AccessPointType>(['physical', 'remote', 'magical'])
 const VALID_NODE_STATES = new Set<NodeState>(['locked', 'active', 'breached', 'alarmed'])
+const VALID_PROFICIENCY_RANKS = new Set<ProficiencyRank>(['untrained', 'trained', 'expert', 'master', 'legendary'])
+
+// SF2e Hacking Types
+interface SkillCheck {
+  skill: string
+  dc: number
+  proficiency?: ProficiencyRank
+}
+
+interface Vulnerability {
+  id: string
+  name: string
+  skills: SkillCheck[]
+  dcReduction: number
+}
+
+interface Countermeasure {
+  id: string
+  name: string
+  failureThreshold: number
+  noticeDC?: number
+  noticeSkills?: string[]
+  disableSkills: SkillCheck[]
+  description: string
+  isPersistent?: boolean
+}
 
 export type ValidationResult<T> =
   | { valid: true; value: T }
@@ -85,6 +125,134 @@ export function validateNumber(
   return input
 }
 
+// ============== SF2e Hacking Validators ==============
+
+function validateSkillCheck(input: unknown): SkillCheck | null {
+  if (!input || typeof input !== 'object') return null
+  const sc = input as Record<string, unknown>
+
+  const skill = sanitizeString(sc.skill, LIMITS.MAX_NAME_LENGTH)
+  if (!skill) return null
+
+  const dc = validateNumber(sc.dc, LIMITS.MIN_DC, LIMITS.MAX_DC)
+  if (dc === null) return null
+
+  const result: SkillCheck = { skill, dc }
+
+  // Optional proficiency
+  if (sc.proficiency !== undefined) {
+    if (!VALID_PROFICIENCY_RANKS.has(sc.proficiency as ProficiencyRank)) {
+      return null
+    }
+    result.proficiency = sc.proficiency as ProficiencyRank
+  }
+
+  return result
+}
+
+function validateSkillChecks(input: unknown): SkillCheck[] | null {
+  if (!Array.isArray(input)) return null
+  if (input.length > LIMITS.MAX_SKILL_CHECKS) return null
+
+  const result: SkillCheck[] = []
+  for (const item of input) {
+    const validated = validateSkillCheck(item)
+    if (!validated) return null
+    result.push(validated)
+  }
+  return result
+}
+
+function validateVulnerability(input: unknown): Vulnerability | null {
+  if (!input || typeof input !== 'object') return null
+  const v = input as Record<string, unknown>
+
+  const id = sanitizeId(v.id)
+  const name = sanitizeString(v.name, LIMITS.MAX_NAME_LENGTH)
+  if (!id || !name) return null
+
+  const skills = validateSkillChecks(v.skills)
+  if (!skills || skills.length === 0) return null
+
+  const dcReduction = validateNumber(v.dcReduction, LIMITS.MIN_DC_REDUCTION, LIMITS.MAX_DC_REDUCTION)
+  if (dcReduction === null) return null
+
+  return { id, name, skills, dcReduction }
+}
+
+function validateVulnerabilities(input: unknown): Vulnerability[] | null {
+  if (!Array.isArray(input)) return null
+  if (input.length > LIMITS.MAX_VULNERABILITIES) return null
+
+  const result: Vulnerability[] = []
+  for (const item of input) {
+    const validated = validateVulnerability(item)
+    if (!validated) return null
+    result.push(validated)
+  }
+  return result
+}
+
+function validateCountermeasure(input: unknown): Countermeasure | null {
+  if (!input || typeof input !== 'object') return null
+  const c = input as Record<string, unknown>
+
+  const id = sanitizeId(c.id)
+  const name = sanitizeString(c.name, LIMITS.MAX_NAME_LENGTH)
+  const description = sanitizeString(c.description, LIMITS.MAX_DESCRIPTION_LENGTH)
+  if (!id || !name || !description) return null
+
+  const failureThreshold = validateNumber(c.failureThreshold, LIMITS.MIN_FAILURE_THRESHOLD, LIMITS.MAX_FAILURE_THRESHOLD)
+  if (failureThreshold === null) return null
+
+  const disableSkills = validateSkillChecks(c.disableSkills)
+  if (!disableSkills) return null
+
+  const result: Countermeasure = { id, name, failureThreshold, disableSkills, description }
+
+  // Optional noticeDC
+  if (c.noticeDC !== undefined) {
+    const noticeDC = validateNumber(c.noticeDC, LIMITS.MIN_DC, LIMITS.MAX_DC)
+    if (noticeDC === null) return null
+    result.noticeDC = noticeDC
+  }
+
+  // Optional noticeSkills
+  if (c.noticeSkills !== undefined) {
+    if (!Array.isArray(c.noticeSkills)) return null
+    if (c.noticeSkills.length > LIMITS.MAX_NOTICE_SKILLS) return null
+
+    const noticeSkills: string[] = []
+    for (const skill of c.noticeSkills) {
+      const sanitized = sanitizeString(skill, LIMITS.MAX_NAME_LENGTH)
+      if (!sanitized) return null
+      noticeSkills.push(sanitized)
+    }
+    result.noticeSkills = noticeSkills
+  }
+
+  // Optional isPersistent
+  if (c.isPersistent !== undefined) {
+    if (typeof c.isPersistent !== 'boolean') return null
+    result.isPersistent = c.isPersistent
+  }
+
+  return result
+}
+
+function validateCountermeasures(input: unknown): Countermeasure[] | null {
+  if (!Array.isArray(input)) return null
+  if (input.length > LIMITS.MAX_COUNTERMEASURES) return null
+
+  const result: Countermeasure[] = []
+  for (const item of input) {
+    const validated = validateCountermeasure(item)
+    if (!validated) return null
+    result.push(validated)
+  }
+  return result
+}
+
 // ============== Payload Validators ==============
 
 interface Position {
@@ -99,6 +267,13 @@ interface AccessPoint {
   state: NodeState
   position: Position
   connectedTo: string[]
+  // SF2e extended fields
+  dc?: number
+  successesRequired?: number
+  hackSkills?: SkillCheck[]
+  vulnerabilities?: Vulnerability[]
+  countermeasures?: Countermeasure[]
+  currentFailures?: number
 }
 
 interface Computer {
@@ -108,6 +283,9 @@ interface Computer {
   type: ComputerType
   description?: string
   accessPoints: AccessPoint[]
+  // SF2e outcome descriptions
+  successDescription?: string
+  criticalSuccessDescription?: string
 }
 
 function validatePosition(input: unknown): Position | null {
@@ -148,7 +326,7 @@ function validateAccessPoint(input: unknown): AccessPoint | null {
     connectedTo.push(sanitized)
   }
 
-  return {
+  const result: AccessPoint = {
     id,
     name,
     type: ap.type as AccessPointType,
@@ -156,6 +334,52 @@ function validateAccessPoint(input: unknown): AccessPoint | null {
     position,
     connectedTo,
   }
+
+  // SF2e extended fields (all optional)
+
+  // dc - primary hacking DC
+  if (ap.dc !== undefined) {
+    const dc = validateNumber(ap.dc, LIMITS.MIN_DC, LIMITS.MAX_DC)
+    if (dc === null) return null
+    result.dc = dc
+  }
+
+  // successesRequired
+  if (ap.successesRequired !== undefined) {
+    const successesRequired = validateNumber(ap.successesRequired, LIMITS.MIN_SUCCESSES_REQUIRED, LIMITS.MAX_SUCCESSES_REQUIRED)
+    if (successesRequired === null) return null
+    result.successesRequired = successesRequired
+  }
+
+  // hackSkills
+  if (ap.hackSkills !== undefined) {
+    const hackSkills = validateSkillChecks(ap.hackSkills)
+    if (!hackSkills) return null
+    result.hackSkills = hackSkills
+  }
+
+  // vulnerabilities
+  if (ap.vulnerabilities !== undefined) {
+    const vulnerabilities = validateVulnerabilities(ap.vulnerabilities)
+    if (!vulnerabilities) return null
+    result.vulnerabilities = vulnerabilities
+  }
+
+  // countermeasures
+  if (ap.countermeasures !== undefined) {
+    const countermeasures = validateCountermeasures(ap.countermeasures)
+    if (!countermeasures) return null
+    result.countermeasures = countermeasures
+  }
+
+  // currentFailures
+  if (ap.currentFailures !== undefined) {
+    const currentFailures = validateNumber(ap.currentFailures, 0, LIMITS.MAX_FAILURE_THRESHOLD)
+    if (currentFailures === null) return null
+    result.currentFailures = currentFailures
+  }
+
+  return result
 }
 
 export function validateComputer(input: unknown): ValidationResult<Computer> {
@@ -193,6 +417,23 @@ export function validateComputer(input: unknown): ValidationResult<Computer> {
     }
   }
 
+  // SF2e outcome descriptions (optional)
+  let successDescription: string | undefined
+  if (comp.successDescription !== undefined && comp.successDescription !== null) {
+    const sanitized = sanitizeString(comp.successDescription, LIMITS.MAX_DESCRIPTION_LENGTH)
+    if (sanitized) {
+      successDescription = sanitized
+    }
+  }
+
+  let criticalSuccessDescription: string | undefined
+  if (comp.criticalSuccessDescription !== undefined && comp.criticalSuccessDescription !== null) {
+    const sanitized = sanitizeString(comp.criticalSuccessDescription, LIMITS.MAX_DESCRIPTION_LENGTH)
+    if (sanitized) {
+      criticalSuccessDescription = sanitized
+    }
+  }
+
   // Validate access points
   if (!Array.isArray(comp.accessPoints)) {
     return { valid: false, error: 'accessPoints must be an array' }
@@ -220,6 +461,8 @@ export function validateComputer(input: unknown): ValidationResult<Computer> {
       type: comp.type as ComputerType,
       description,
       accessPoints,
+      successDescription,
+      criticalSuccessDescription,
     }
   }
 }
