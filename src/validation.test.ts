@@ -5,6 +5,7 @@ import {
   validateNumber,
   validateComputer,
   validateNodeStatePayload,
+  validateNodeHiddenPayload,
   validateFocusPayload,
   validateIntensityPayload,
   validateMessageType,
@@ -235,6 +236,42 @@ describe('validateNodeStatePayload', () => {
   })
 })
 
+// ============== validateNodeHiddenPayload ==============
+describe('validateNodeHiddenPayload', () => {
+  it('accepts valid payloads', () => {
+    const result = validateNodeHiddenPayload({ nodeId: 'node-1', hidden: true })
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.value.nodeId).toBe('node-1')
+      expect(result.value.hidden).toBe(true)
+    }
+  })
+
+  it('accepts hidden=false', () => {
+    const result = validateNodeHiddenPayload({ nodeId: 'node-1', hidden: false })
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.value.hidden).toBe(false)
+    }
+  })
+
+  it('rejects non-boolean hidden field', () => {
+    expect(validateNodeHiddenPayload({ nodeId: 'node-1', hidden: 'true' }).valid).toBe(false)
+    expect(validateNodeHiddenPayload({ nodeId: 'node-1', hidden: 1 }).valid).toBe(false)
+    expect(validateNodeHiddenPayload({ nodeId: 'node-1' }).valid).toBe(false)
+  })
+
+  it('rejects invalid node IDs', () => {
+    expect(validateNodeHiddenPayload({ nodeId: '<script>', hidden: true }).valid).toBe(false)
+    expect(validateNodeHiddenPayload({ nodeId: '', hidden: true }).valid).toBe(false)
+  })
+
+  it('rejects null/undefined', () => {
+    expect(validateNodeHiddenPayload(null).valid).toBe(false)
+    expect(validateNodeHiddenPayload(undefined).valid).toBe(false)
+  })
+})
+
 // ============== validateFocusPayload ==============
 describe('validateFocusPayload', () => {
   it('accepts valid node ID', () => {
@@ -294,6 +331,10 @@ describe('validateMessageType', () => {
   it('accepts combat sync message types', () => {
     expect(validateMessageType('combat-state')).toBe('combat-state')
     expect(validateMessageType('request-state')).toBe('request-state')
+  })
+
+  it('accepts node-hidden message type', () => {
+    expect(validateMessageType('node-hidden')).toBe('node-hidden')
   })
 
   it('rejects invalid message types', () => {

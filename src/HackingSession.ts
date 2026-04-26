@@ -4,6 +4,7 @@
 import {
   validateComputer,
   validateNodeStatePayload,
+  validateNodeHiddenPayload,
   validateFocusPayload,
   validateIntensityPayload,
   validateMessageType,
@@ -94,6 +95,7 @@ const RATE_LIMIT_MAX_MESSAGES = 50   // 50 messages per window
 type MessageType =
   | 'effect'
   | 'node-state'
+  | 'node-hidden'
   | 'focus'
   | 'intensity'
   | 'computer'
@@ -321,6 +323,23 @@ export class HackingSession implements DurableObject {
           const node = this.computer.accessPoints.find(ap => ap.id === result.value.nodeId)
           if (node) {
             node.state = result.value.state
+          }
+        }
+        validatedPayload = result.value
+        break
+      }
+
+      case 'node-hidden': {
+        const result = validateNodeHiddenPayload(data.payload)
+        if (!result.valid) {
+          this.sendError(ws, 'INVALID_PAYLOAD', result.error)
+          console.warn('[HackingSession] Invalid node-hidden payload:', result.error)
+          return
+        }
+        if (this.computer) {
+          const node = this.computer.accessPoints.find(ap => ap.id === result.value.nodeId)
+          if (node) {
+            node.hidden = result.value.hidden
           }
         }
         validatedPayload = result.value

@@ -496,6 +496,28 @@ export function validateNodeStatePayload(input: unknown): ValidationResult<{ nod
   }
 }
 
+export function validateNodeHiddenPayload(input: unknown): ValidationResult<{ nodeId: string; hidden: boolean }> {
+  if (!input || typeof input !== 'object') {
+    return { valid: false, error: 'Invalid node-hidden payload' }
+  }
+
+  const payload = input as Record<string, unknown>
+
+  const nodeId = sanitizeId(payload.nodeId)
+  if (!nodeId) {
+    return { valid: false, error: 'Invalid node ID' }
+  }
+
+  if (typeof payload.hidden !== 'boolean') {
+    return { valid: false, error: 'hidden must be a boolean' }
+  }
+
+  return {
+    valid: true,
+    value: { nodeId, hidden: payload.hidden }
+  }
+}
+
 export function validateFocusPayload(input: unknown): ValidationResult<{ nodeId: string | null }> {
   if (!input || typeof input !== 'object') {
     return { valid: false, error: 'Invalid focus payload' }
@@ -540,6 +562,8 @@ export function validateMessageType(input: unknown): string | null {
   const validTypes = new Set([
     'effect', 'node-state', 'focus', 'intensity',
     'computer', 'clear-effects', 'ping', 'init', 'pong',
+    // Hacking node visibility toggle
+    'node-hidden',
     // Combat sync messages
     'combat-state', 'request-state'
   ])
