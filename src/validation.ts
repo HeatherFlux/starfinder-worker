@@ -565,7 +565,11 @@ export function validateMessageType(input: unknown): string | null {
     // Hacking node visibility toggle
     'node-hidden',
     // Combat sync messages
-    'combat-state', 'request-state'
+    'combat-state', 'request-state',
+    // Starship sync messages (relay-only, GM is source of truth)
+    'scene-update', 'starship-update', 'threat-update',
+    'round-change', 'vp-change', 'action-log',
+    'role-assignment', 'initiative-update', 'turn-change'
   ])
 
   return validTypes.has(input) ? input : null

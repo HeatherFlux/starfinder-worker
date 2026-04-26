@@ -337,6 +337,17 @@ describe('validateMessageType', () => {
     expect(validateMessageType('node-hidden')).toBe('node-hidden')
   })
 
+  it('accepts all starship sync message types', () => {
+    const starshipTypes = [
+      'scene-update', 'starship-update', 'threat-update',
+      'round-change', 'vp-change', 'action-log',
+      'role-assignment', 'initiative-update', 'turn-change',
+    ]
+    for (const type of starshipTypes) {
+      expect(validateMessageType(type)).toBe(type)
+    }
+  })
+
   it('rejects invalid message types', () => {
     expect(validateMessageType('execute')).toBeNull()
     expect(validateMessageType('hack')).toBeNull()

@@ -106,6 +106,23 @@ type MessageType =
   // Combat sync messages (state managed client-side, worker just relays)
   | 'combat-state'
   | 'request-state'
+  // Starship sync messages (relay-only, GM is source of truth)
+  | 'scene-update'
+  | 'starship-update'
+  | 'threat-update'
+  | 'round-change'
+  | 'vp-change'
+  | 'action-log'
+  | 'role-assignment'
+  | 'initiative-update'
+  | 'turn-change'
+
+// GM-only relay-only message types (no server-side state, just forward to others)
+const STARSHIP_RELAY_TYPES = new Set<MessageType>([
+  'scene-update', 'starship-update', 'threat-update',
+  'round-change', 'vp-change', 'action-log',
+  'role-assignment', 'initiative-update', 'turn-change'
+])
 
 interface SyncMessage {
   type: MessageType
@@ -279,6 +296,22 @@ export class HackingSession implements DurableObject {
         return
       }
       // Broadcast to all other connections and return (no state persistence)
+      const messageStr = JSON.stringify(data)
+      for (const socket of this.state.getWebSockets()) {
+        if (socket !== ws && socket.readyState === WebSocket.OPEN) {
+          socket.send(messageStr)
+        }
+      }
+      this.scheduleCleanup()
+      return
+    }
+
+    // Starship sync: relay-only, GM-only (no server-side state)
+    if (STARSHIP_RELAY_TYPES.has(messageType as MessageType)) {
+      if (sender.role !== 'gm') {
+        this.sendError(ws, 'UNAUTHORIZED', 'Only GM can send starship state')
+        return
+      }
       const messageStr = JSON.stringify(data)
       for (const socket of this.state.getWebSockets()) {
         if (socket !== ws && socket.readyState === WebSocket.OPEN) {
