@@ -59,6 +59,7 @@ interface AccessPoint {
   vulnerabilities?: Vulnerability[]
   countermeasures?: Countermeasure[]
   currentFailures?: number
+  hidden?: boolean
 }
 
 interface Computer {

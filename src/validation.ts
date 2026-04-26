@@ -274,6 +274,7 @@ interface AccessPoint {
   vulnerabilities?: Vulnerability[]
   countermeasures?: Countermeasure[]
   currentFailures?: number
+  hidden?: boolean
 }
 
 interface Computer {
@@ -377,6 +378,12 @@ function validateAccessPoint(input: unknown): AccessPoint | null {
     const currentFailures = validateNumber(ap.currentFailures, 0, LIMITS.MAX_FAILURE_THRESHOLD)
     if (currentFailures === null) return null
     result.currentFailures = currentFailures
+  }
+
+  // hidden (GM visibility toggle for player views)
+  if (ap.hidden !== undefined) {
+    if (typeof ap.hidden !== 'boolean') return null
+    result.hidden = ap.hidden
   }
 
   return result

@@ -174,6 +174,39 @@ describe('validateComputer', () => {
     expect(result.valid).toBe(false)
   })
 
+  it('preserves hidden field on access points', () => {
+    const result = validateComputer({
+      ...validComputer,
+      accessPoints: [{
+        ...validComputer.accessPoints[0],
+        hidden: true,
+      }],
+    })
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.value.accessPoints[0].hidden).toBe(true)
+    }
+  })
+
+  it('rejects non-boolean hidden field', () => {
+    const result = validateComputer({
+      ...validComputer,
+      accessPoints: [{
+        ...validComputer.accessPoints[0],
+        hidden: 'yes',
+      }],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('omits hidden field when not provided', () => {
+    const result = validateComputer(validComputer)
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.value.accessPoints[0].hidden).toBeUndefined()
+    }
+  })
+
   it('rejects null/undefined', () => {
     expect(validateComputer(null).valid).toBe(false)
     expect(validateComputer(undefined).valid).toBe(false)
