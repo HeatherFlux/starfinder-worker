@@ -252,10 +252,15 @@ describe('validateIntensityPayload', () => {
 // ============== validateMessageType ==============
 describe('validateMessageType', () => {
   it('accepts valid message types', () => {
-    const validTypes = ['effect', 'node-state', 'focus', 'intensity', 'computer', 'clear-effects', 'ping', 'pong', 'init']
+    const validTypes = ['effect', 'node-state', 'focus', 'intensity', 'computer', 'clear-effects', 'ping', 'pong', 'init', 'combat-state', 'request-state']
     for (const type of validTypes) {
       expect(validateMessageType(type)).toBe(type)
     }
+  })
+
+  it('accepts combat sync message types', () => {
+    expect(validateMessageType('combat-state')).toBe('combat-state')
+    expect(validateMessageType('request-state')).toBe('request-state')
   })
 
   it('rejects invalid message types', () => {

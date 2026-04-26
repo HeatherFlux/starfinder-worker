@@ -532,7 +532,9 @@ export function validateMessageType(input: unknown): string | null {
 
   const validTypes = new Set([
     'effect', 'node-state', 'focus', 'intensity',
-    'computer', 'clear-effects', 'ping', 'init', 'pong'
+    'computer', 'clear-effects', 'ping', 'init', 'pong',
+    // Combat sync messages
+    'combat-state', 'request-state'
   ])
 
   return validTypes.has(input) ? input : null

@@ -100,6 +100,9 @@ type MessageType =
   | 'ping'
   | 'init'
   | 'pong'
+  // Combat sync messages (state managed client-side, worker just relays)
+  | 'combat-state'
+  | 'request-state'
 
 interface SyncMessage {
   type: MessageType
@@ -265,7 +268,25 @@ export class HackingSession implements DurableObject {
       return
     }
 
-    // Only GM can send state changes
+    // Combat sync: relay-only messages (no server-side state, just forward between clients)
+    if (messageType === 'request-state' || messageType === 'combat-state') {
+      // Players can send request-state; GM can send combat-state
+      if (messageType === 'combat-state' && sender.role !== 'gm') {
+        this.sendError(ws, 'UNAUTHORIZED', 'Only GM can send combat state')
+        return
+      }
+      // Broadcast to all other connections and return (no state persistence)
+      const messageStr = JSON.stringify(data)
+      for (const socket of this.state.getWebSockets()) {
+        if (socket !== ws && socket.readyState === WebSocket.OPEN) {
+          socket.send(messageStr)
+        }
+      }
+      this.scheduleCleanup()
+      return
+    }
+
+    // Only GM can send hacking state changes
     if (sender.role !== 'gm') {
       this.sendError(ws, 'UNAUTHORIZED', 'Only GM can modify session state')
       console.log('[HackingSession] Non-GM tried to send:', messageType)
